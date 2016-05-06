@@ -11,25 +11,26 @@ TODO
 Backbone.Autocomplete = {
   DEBUG: false,
 
-  // @param input [HTMLInputElement]
+  // @param queryField [HTMLInputElement]
   // @param options [Object]
   // @param options.collection [Backbone.Collection]
   // @param options.selected [Backbone.Model]
-  create(input, options = {}) {
+  create(queryField, options = {}) {
     const view = new Backbone.Autocomplete.View(
-      _({ el: this.createContainerElement(input),
+      _({ el: this.createContainerElement(queryField),
+          queryField: queryField,
           collection: this.extractCollection(options),
       }).extend(options)
     );
 
-    $(input).data("Backbone.Autocomplete.View", view);
+    $(queryField).data("Backbone.Autocomplete.View", view);
     return view;
   },
 
-  createContainerElement(input) {
+  createContainerElement(queryField) {
     const el = $("<div>").addClass("backbone-autocomplete");
-    $(input).before(el);
-    $(el).append(input);
+    $(queryField).before(el);
+    $(el).append(queryField);
 
     return el;
   },
@@ -199,15 +200,15 @@ Backbone.Autocomplete.View = Backbone.View.extend({
   },
 
   events: {
-    "focus input": "onFocus",
-    "blur input": "onBlur",
-    "keydown input": "onKeyDown",
-    "keyup input": "onKeyUp",
+    "focus [data-backbone-autocomplete-view-query-field]": "onFocus",
+    "blur [data-backbone-autocomplete-view-query-field]": "onBlur",
+    "keydown [data-backbone-autocomplete-view-query-field]": "onKeyDown",
+    "keyup [data-backbone-autocomplete-view-query-field]": "onKeyUp",
   },
 
   initialize(options) {
-    this.input = this.$("input")[0];
-    this.$input = $(this.input);
+    this.queryField = options.queryField;
+    this.$queryField = $(this.queryField).attr("data-backbone-autocomplete-view-query-field", "true");
 
     this.state = new Backbone.Autocomplete.State({
       collection: options.collection,
@@ -232,17 +233,17 @@ Backbone.Autocomplete.View = Backbone.View.extend({
     } else {
       this.$el.removeClass("is-invalid");
     }
-    this.$input.val(this.state.get("query"));
+    this.$queryField.val(this.state.get("query"));
     this.renderDropdownView();
   },
 
   renderDropdownView() {
-    const $input = this.$input;
+    const $queryField = this.$queryField;
     this.dropdownView.render({
       css: {
-        fontSize: $input.css("font-size"),
-        top: $input.position().top + $input.outerHeight() - 1,
-        minWidth: $input.innerWidth(),
+        fontSize: $queryField.css("font-size"),
+        top: $queryField.position().top + $queryField.outerHeight() - 1,
+        minWidth: $queryField.innerWidth(),
       },
     });
   },
@@ -295,7 +296,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
       case "Enter":
         break;
       default:
-        this.state.updateQuery(this.$input.val());
+        this.state.updateQuery(this.$queryField.val());
     }
   },
 });
