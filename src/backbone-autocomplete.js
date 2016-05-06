@@ -4,7 +4,7 @@ TODO
 - model.get("label") が決め打ちなのを修正
 - jquery ui 互換のインターフェイス
 - stickkit 対応 (hidden 使う?)
-- ロード時の selected
+- 文字入力されていて selected が null なら is-invalid クラス付与
 */
 
 // #query を元に fetch できる collection を指定する
@@ -12,13 +12,58 @@ Backbone.Autocomplete = {
   // @param input [HTMLInputElement]
   // @param options [Object]
   // @param options.collection [Backbone.Collection]
+  // @param options.selected [Backbone.Model]
   create(input, options = {}) {
+    const view = new Backbone.Autocomplete.View(
+      _({ el: this.createContainerElement(input),
+          collection: this.extractCollection(options),
+      }).extend(options)
+    );
+
+    $(input).data("Backbone.Autocomplete.View", view);
+    return view;
+  },
+
+  createContainerElement(input) {
     const el = $("<div>");
     $(input).before(el);
     $(el).append(input);
 
-    return new Backbone.Autocomplete.View(_({el: el}).extend(options));
-  }
+    return el;
+  },
+
+  extractCollection(options) {
+    let collection = options.collection;
+    delete options.collection;
+
+    if (!collection) {
+      const url = options.url;
+      delete options.url;
+
+      if (!url) {
+        throw "Backbone.Autocomplete.create requires collection or url";
+      }
+
+      collection = this.createCollectionFromURL(url);
+    }
+
+    return collection;
+  },
+
+  createCollectionFromURL(url) {
+    const model_class = Backbone.Model.extend({
+      idAttribute: "value",
+    });
+
+    const collection_class = Backbone.Collection.extend({
+      model: model_class,
+      url() {
+        return url + "?q=" + window.encodeURIComponent(this.query);
+      },
+    });
+
+    return new collection_class;
+  },
 };
 
 Backbone.Autocomplete.View = Backbone.View.extend({
@@ -35,12 +80,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
     this.collection = options.collection;
     this.createDropdownView();
     this.dropdownFocused = false;
-    this.selected = null;
-
-    // debug
-    setInterval(() => {
-      console.log(this.selected)
-    }, 1000);
+    this.updateSelected(options.selected || null);
   },
 
   createDropdownView() {
@@ -85,7 +125,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
   },
 
   showDropdown(e){
-    this.dropdownView.show()
+    this.dropdownView.show();
   },
 
   hideDropdown(e) {
@@ -181,10 +221,6 @@ Backbone.Autocomplete.DropdownView = Backbone.View.extend({
   resetOptions() {
     this.$el.empty();
     this.itemViews = [];
-    this.selectedItemView = null;
-    this.focusedItemView = null;
-
-    this.trigger("selected", null);
 
     this.collection.each(model => {
       const view = new Backbone.Autocomplete.DropdownItemView({model: model})
@@ -197,6 +233,24 @@ Backbone.Autocomplete.DropdownView = Backbone.View.extend({
 
     if (this.collection.length == 1) {
       this.itemViews[0].focus({by: "key"});
+    }
+
+    const focused = this.focusedItemView && this.focusedItemView.model;
+    if (focused) {
+      const focused_view = _(this.itemViews).find((v) => v.model.id === focused.id);
+      if (focused_view) {
+        focused_view.focus({by: "key"});
+      } else {
+        this.focusedItemView = null;
+      }
+    }
+
+    const selected = this.selectedItemView && this.selectedItemView.model;
+    if (selected) {
+      const selected_view = _(this.itemViews).find((v) => v.model.id === selected.id);
+      if (!selected_view) {
+        this.selectedItemView = null;
+      }
     }
   },
 
@@ -244,16 +298,7 @@ Backbone.Autocomplete.DropdownView = Backbone.View.extend({
   },
 
   onSelected(item_view) {
-    // if (by === "click") {
-      this.hide();
-    // }
-
-    // this.itemViews.forEach(v => {
-    //   if (v !== item_view) {
-    //     v.unfocus();
-    //   }
-    // });
-
+    this.hide();
     this.focusedItemView = item_view;
     this.selectedItemView = item_view;
     this.trigger("selected", item_view.model);
@@ -263,17 +308,21 @@ Backbone.Autocomplete.DropdownView = Backbone.View.extend({
     this.focusedItemView = item_view;
 
     if (by === "key") {
-      const item_view_top = $(item_view.el).position().top;
-      const item_view_height = $(item_view.el).outerHeight();
-      const scroll_top = this.$el.scrollTop();
+      this.scrollToItemView(item_view);
+    }
+  },
 
-      if (item_view_top < 0) {
-        // 上にはみ出した場合
-        this.$el.scrollTop(scroll_top + item_view_top);
-      } else if (this.$el.outerHeight() < (item_view_top + item_view_height)) {
-        // 下にはみ出した場合
-        this.$el.scrollTop(scroll_top + item_view_height);
-      }
+  scrollToItemView(item_view) {
+    const item_view_top = $(item_view.el).position().top;
+    const item_view_height = $(item_view.el).outerHeight();
+    const scroll_top = this.$el.scrollTop();
+
+    if (item_view_top < 0) {
+      // 上にはみ出した場合
+      this.$el.scrollTop(scroll_top + item_view_top);
+    } else if (this.$el.outerHeight() < (item_view_top + item_view_height)) {
+      // 下にはみ出した場合
+      this.$el.scrollTop(scroll_top + item_view_height);
     }
   }
 });

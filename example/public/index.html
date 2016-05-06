@@ -34,12 +34,13 @@
 $(function(){
   window.autocompleteView = Backbone.Autocomplete.create(
     $("[name=user_name]")[0],
-    { collection: new (Backbone.Collection.extend({
-        url: function() {
-          return "/lang?q=" + encodeURIComponent(this.query);
-        },
-      }))
+    { url: "/lang",
+      selected: new Backbone.Model({label: "JavaScript", value: "JavaScript"})
     }
   );
+
+  window.setInterval(function() {
+    console.log($("[name=user_name]").data("Backbone.Autocomplete.View").selected);
+  }, 1000);
 })
 </script>

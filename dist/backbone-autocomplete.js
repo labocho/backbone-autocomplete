@@ -6,7 +6,7 @@ TODO
 - model.get("label") が決め打ちなのを修正
 - jquery ui 互換のインターフェイス
 - stickkit 対応 (hidden 使う?)
-- ロード時の selected
+- 文字入力されていて selected が null なら is-invalid クラス付与
 */
 
 // #query を元に fetch できる collection を指定する
@@ -14,15 +14,55 @@ Backbone.Autocomplete = {
   // @param input [HTMLInputElement]
   // @param options [Object]
   // @param options.collection [Backbone.Collection]
+  // @param options.selected [Backbone.Model]
 
   create: function create(input) {
     var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
+    var view = new Backbone.Autocomplete.View(_({ el: this.createContainerElement(input),
+      collection: this.extractCollection(options)
+    }).extend(options));
+
+    $(input).data("Backbone.Autocomplete.View", view);
+    return view;
+  },
+  createContainerElement: function createContainerElement(input) {
     var el = $("<div>");
     $(input).before(el);
     $(el).append(input);
 
-    return new Backbone.Autocomplete.View(_({ el: el }).extend(options));
+    return el;
+  },
+  extractCollection: function extractCollection(options) {
+    var collection = options.collection;
+    delete options.collection;
+
+    if (!collection) {
+      var url = options.url;
+      delete options.url;
+
+      if (!url) {
+        throw "Backbone.Autocomplete.create requires collection or url";
+      }
+
+      collection = this.createCollectionFromURL(url);
+    }
+
+    return collection;
+  },
+  createCollectionFromURL: function createCollectionFromURL(_url) {
+    var model_class = Backbone.Model.extend({
+      idAttribute: "value"
+    });
+
+    var collection_class = Backbone.Collection.extend({
+      model: model_class,
+      url: function url() {
+        return _url + "?q=" + window.encodeURIComponent(this.query);
+      }
+    });
+
+    return new collection_class();
   }
 };
 
@@ -35,19 +75,12 @@ Backbone.Autocomplete.View = Backbone.View.extend({
   },
 
   initialize: function initialize(options) {
-    var _this = this;
-
     this.input = this.$("input")[0];
     this.$input = $(this.input);
     this.collection = options.collection;
     this.createDropdownView();
     this.dropdownFocused = false;
-    this.selected = null;
-
-    // debug
-    setInterval(function () {
-      console.log(_this.selected);
-    }, 1000);
+    this.updateSelected(options.selected || null);
   },
   createDropdownView: function createDropdownView() {
     this.dropdownView = new Backbone.Autocomplete.DropdownView({
@@ -175,26 +208,44 @@ Backbone.Autocomplete.DropdownView = Backbone.View.extend({
     this.parent.dropdownFocused = false;
   },
   resetOptions: function resetOptions() {
-    var _this2 = this;
+    var _this = this;
 
     this.$el.empty();
     this.itemViews = [];
-    this.selectedItemView = null;
-    this.focusedItemView = null;
-
-    this.trigger("selected", null);
 
     this.collection.each(function (model) {
       var view = new Backbone.Autocomplete.DropdownItemView({ model: model });
-      view.on("selected", _this2.onSelected, _this2);
-      view.on("focused", _this2.onFocused, _this2);
+      view.on("selected", _this.onSelected, _this);
+      view.on("focused", _this.onFocused, _this);
       view.render();
-      _this2.$el.append(view.el);
-      _this2.itemViews.push(view);
+      _this.$el.append(view.el);
+      _this.itemViews.push(view);
     });
 
     if (this.collection.length == 1) {
       this.itemViews[0].focus({ by: "key" });
+    }
+
+    var focused = this.focusedItemView && this.focusedItemView.model;
+    if (focused) {
+      var focused_view = _(this.itemViews).find(function (v) {
+        return v.model.id === focused.id;
+      });
+      if (focused_view) {
+        focused_view.focus({ by: "key" });
+      } else {
+        this.focusedItemView = null;
+      }
+    }
+
+    var selected = this.selectedItemView && this.selectedItemView.model;
+    if (selected) {
+      var selected_view = _(this.itemViews).find(function (v) {
+        return v.model.id === selected.id;
+      });
+      if (!selected_view) {
+        this.selectedItemView = null;
+      }
     }
   },
   focusDown: function focusDown() {
@@ -204,12 +255,12 @@ Backbone.Autocomplete.DropdownView = Backbone.View.extend({
     this.focusRelative(-1);
   },
   focusRelative: function focusRelative(offset) {
-    var _this3 = this;
+    var _this2 = this;
 
     var view_will_be_focus = void 0;
     if (this.focusedItemView) {
       this.itemViews.forEach(function (v, i, list) {
-        if (v == _this3.focusedItemView) {
+        if (v == _this2.focusedItemView) {
           view_will_be_focus = list[i + offset];
           return;
         }
@@ -240,16 +291,7 @@ Backbone.Autocomplete.DropdownView = Backbone.View.extend({
     this.parent.dropdownFocused = true;
   },
   onSelected: function onSelected(item_view) {
-    // if (by === "click") {
     this.hide();
-    // }
-
-    // this.itemViews.forEach(v => {
-    //   if (v !== item_view) {
-    //     v.unfocus();
-    //   }
-    // });
-
     this.focusedItemView = item_view;
     this.selectedItemView = item_view;
     this.trigger("selected", item_view.model);
@@ -261,17 +303,20 @@ Backbone.Autocomplete.DropdownView = Backbone.View.extend({
     this.focusedItemView = item_view;
 
     if (by === "key") {
-      var item_view_top = $(item_view.el).position().top;
-      var item_view_height = $(item_view.el).outerHeight();
-      var scroll_top = this.$el.scrollTop();
+      this.scrollToItemView(item_view);
+    }
+  },
+  scrollToItemView: function scrollToItemView(item_view) {
+    var item_view_top = $(item_view.el).position().top;
+    var item_view_height = $(item_view.el).outerHeight();
+    var scroll_top = this.$el.scrollTop();
 
-      if (item_view_top < 0) {
-        // 上にはみ出した場合
-        this.$el.scrollTop(scroll_top + item_view_top);
-      } else if (this.$el.outerHeight() < item_view_top + item_view_height) {
-        // 下にはみ出した場合
-        this.$el.scrollTop(scroll_top + item_view_height);
-      }
+    if (item_view_top < 0) {
+      // 上にはみ出した場合
+      this.$el.scrollTop(scroll_top + item_view_top);
+    } else if (this.$el.outerHeight() < item_view_top + item_view_height) {
+      // 下にはみ出した場合
+      this.$el.scrollTop(scroll_top + item_view_height);
     }
   }
 });
