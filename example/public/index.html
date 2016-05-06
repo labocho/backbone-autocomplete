@@ -5,6 +5,9 @@
 <script src="/backbone-autocomplete.js"></script>
 
 <style>
+.backbone-autocomplete.is-invalid input {
+  border-color: #f00;
+}
 .backbone-autocomplete-dropdown {
   position: absolute;
   border: 1px solid #ccc;
@@ -32,6 +35,7 @@
 
 <script>
 $(function(){
+  Backbone.Autocomplete.DEBUG = true;
   window.autocompleteView = Backbone.Autocomplete.create(
     $("[name=user_name]")[0],
     { url: "/lang",

@@ -11,11 +11,12 @@ TODO
 
 // #query を元に fetch できる collection を指定する
 Backbone.Autocomplete = {
+  DEBUG: false,
+
   // @param input [HTMLInputElement]
   // @param options [Object]
   // @param options.collection [Backbone.Collection]
   // @param options.selected [Backbone.Model]
-
   create: function create(input) {
     var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
@@ -27,7 +28,7 @@ Backbone.Autocomplete = {
     return view;
   },
   createContainerElement: function createContainerElement(input) {
-    var el = $("<div>");
+    var el = $("<div>").addClass("backbone-autocomplete");
     $(input).before(el);
     $(el).append(input);
 
@@ -66,7 +67,143 @@ Backbone.Autocomplete = {
   }
 };
 
+// flux の dispatcher, action creator, store の役割
+Backbone.Autocomplete.State = Backbone.Model.extend({
+  defaults: {
+    query: "",
+    collection: null,
+    dropdownFocused: false,
+    focused: null,
+    focusedBy: null,
+    selected: null,
+    showDropdown: false
+  },
+
+  constructor: function constructor() {
+    var _this = this;
+
+    Backbone.Model.prototype.constructor.apply(this, arguments);
+    this.get("collection").on("sync", function () {
+      return _this.onSyncCollection();
+    });
+    this.on("change:query", function () {
+      return _this.onChangeQuery();
+    });
+    this.on("change:selected", function () {
+      return _this.onChangeSelected();
+    });
+    if (Backbone.Autocomplete.DEBUG) {
+      this.on("change", function () {
+        console.log(_this.attributes);
+      });
+    }
+  },
+  onSyncCollection: function onSyncCollection() {
+    if (this.get("collection").length === 0) {
+      this.set({ selected: null, focused: null });
+    }
+    this.trigger("change");
+  },
+  onChangeQuery: function onChangeQuery() {
+    this.get("collection").query = this.get("query");
+    this.get("collection").fetch();
+  },
+  onChangeSelected: function onChangeSelected() {
+    var selected = this.get("selected");
+    if (selected) {
+      this.set({ query: selected.get("label") });
+    }
+  },
+  logAction: function logAction(type) {
+    if (Backbone.Autocomplete.DEBUG) {
+      var _console;
+
+      for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+        args[_key - 1] = arguments[_key];
+      }
+
+      (_console = console).log.apply(_console, [type].concat(args));
+    }
+  },
+  updateQuery: function updateQuery(query) {
+    this.logAction("updateQuery", query);
+    this.set({ query: query });
+  },
+  showDropdown: function showDropdown() {
+    this.logAction("showDropdown");
+    this.set({ showDropdown: true });
+  },
+  hideDropdown: function hideDropdown() {
+    this.logAction("hideDropdown");
+    this.set({
+      showDropdown: false,
+      dropdownFocused: false
+    });
+  },
+  focusItem: function focusItem(item, _ref) {
+    var _ref$by = _ref.by;
+    var by = _ref$by === undefined ? null : _ref$by;
+
+    this.logAction("focusItem", { by: by });
+    this.set({
+      focused: item,
+      focusedBy: by
+    });
+  },
+  focusUp: function focusUp() {
+    this.logAction("focusUp");
+    this.focusRelative(-1);
+  },
+  focusDown: function focusDown() {
+    this.logAction("focusDown");
+    this.focusRelative(1);
+  },
+
+
+  // private
+  focusRelative: function focusRelative(offset) {
+    var model_will_be_focused = void 0;
+    var focused = this.get("focused");
+    var focused_exists_in_collection = focused && this.get("collection").find(function (m) {
+      return m.id === focused.id;
+    });
+
+    if (focused && focused_exists_in_collection) {
+      this.get("collection").models.forEach(function (m, i, list) {
+        if (m.id === focused.id) {
+          model_will_be_focused = list[i + offset];
+          return;
+        }
+      });
+    } else {
+      model_will_be_focused = this.get("collection").models[0];
+    }
+
+    if (model_will_be_focused) {
+      this.focusItem(model_will_be_focused, { by: "key" });
+    }
+  },
+  updateDropdownFocused: function updateDropdownFocused(value) {
+    this.logAction("updateDropdownFocused", value);
+    this.set({ dropdownFocused: value });
+  },
+  selectItemFocusedByKey: function selectItemFocusedByKey() {
+    this.logAction("selectItemFocusedByKey");
+    if (this.get("focused") && this.get("focusedBy") === "key") {
+      this.set({ selected: this.get("focused") });
+    }
+  },
+  selectItem: function selectItem(model) {
+    this.logAction("selectItem");
+    this.set({ selected: model });
+  }
+});
+
 Backbone.Autocomplete.View = Backbone.View.extend({
+  attributes: {
+    class: "backbone-autocomplete"
+  },
+
   events: {
     "focus input": "onFocus",
     "blur input": "onBlur",
@@ -75,59 +212,61 @@ Backbone.Autocomplete.View = Backbone.View.extend({
   },
 
   initialize: function initialize(options) {
+    var _this2 = this;
+
     this.input = this.$("input")[0];
     this.$input = $(this.input);
-    this.collection = options.collection;
-    this.createDropdownView();
-    this.dropdownFocused = false;
-    this.updateSelected(options.selected || null);
-  },
-  createDropdownView: function createDropdownView() {
-    this.dropdownView = new Backbone.Autocomplete.DropdownView({
-      collection: this.collection,
-      parent: this
+
+    this.state = new Backbone.Autocomplete.State({
+      collection: options.collection,
+      selected: options.selected || null
     });
 
-    this.dropdownView.on("selected", this.onSelected, this);
-    this.dropdownView.render();
+    this.state.on("change:selected", function () {
+      _this2.selected = _this2.state.get("selected");
+      _this2.trigger("change", _this2);
+    });
 
-    $(this.el).append(this.dropdownView.el);
+    this.state.on("change", function () {
+      _this2.render();
+    });
 
-    this.fetchCollection();
+    this.createDropdownView();
   },
-  updateSelected: function updateSelected(model) {
-    this.selected = model;
-    if (model) {
-      this.$input.val(model.get("label"));
+  render: function render() {
+    if (this.state.get("query") && !this.state.get("selected")) {
+      this.$el.addClass("is-invalid");
+    } else {
+      this.$el.removeClass("is-invalid");
     }
-    this.trigger("change", this);
+    this.$input.val(this.state.get("query"));
+    this.renderDropdownView();
+  },
+  renderDropdownView: function renderDropdownView() {
+    var $input = this.$input;
+    this.dropdownView.render({
+      css: {
+        fontSize: $input.css("font-size"),
+        top: $input.position().top + $input.outerHeight() - 1,
+        minWidth: $input.innerWidth()
+      }
+    });
+  },
+  createDropdownView: function createDropdownView() {
+    this.dropdownView = new Backbone.Autocomplete.DropdownView({ state: this.state });
+    $(this.el).append(this.dropdownView.el);
   },
   onFocus: function onFocus(e) {
-    this.showDropdown();
+    this.state.showDropdown();
   },
   onBlur: function onBlur(e) {
-    if (!this.dropdownFocused) {
-      this.hideDropdown();
-      this.dropdownView.selectItemFocusedByKey();
-
-      if (this.$input.val() === "") {
-        this.updateSelected(null);
-      } else {
-        if (this.selected) {
-          this.$input.val(this.selected.get("label"));
-        }
+    if (!this.state.get("dropdownFocused")) {
+      this.state.selectItemFocusedByKey();
+      this.state.hideDropdown();
+      if (this.state.get("query") === "") {
+        this.state.selectItem(null);
       }
     }
-  },
-  showDropdown: function showDropdown(e) {
-    this.dropdownView.show();
-  },
-  hideDropdown: function hideDropdown(e) {
-    this.dropdownView.hide();
-    this.dropdownFocused = false;
-  },
-  onSelected: function onSelected(model) {
-    this.updateSelected(model);
   },
 
 
@@ -137,15 +276,15 @@ Backbone.Autocomplete.View = Backbone.View.extend({
     switch (e.originalEvent.code) {
       case "ArrowUp":
         e.preventDefault();
-        this.dropdownView.focusUp();
+        this.state.focusUp();
         break;
       case "ArrowDown":
         e.preventDefault();
-        this.dropdownView.focusDown();
+        this.state.focusDown();
         break;
       case "Enter":
-        this.dropdownView.selectItemFocusedByKey();
-        this.hideDropdown();
+        this.state.selectItemFocusedByKey();
+        this.state.hideDropdown();
         break;
     }
   },
@@ -161,152 +300,87 @@ Backbone.Autocomplete.View = Backbone.View.extend({
       case "Enter":
         break;
       default:
-        this.fetchCollection();
-    }
-  },
-  fetchCollection: function fetchCollection() {
-    var old_query = this.collection.query;
-    var query = this.$input.val();
-    if (old_query !== query) {
-      this.collection.query = query;
-      this.collection.fetch();
+        this.state.updateQuery(this.$input.val());
     }
   }
 });
 
 Backbone.Autocomplete.DropdownView = Backbone.View.extend({
   tagName: "ul",
+  attributes: {
+    class: "backbone-autocomplete-dropdown"
+  },
 
   events: {
     "mousedown": "onMouseDown"
   },
 
   initialize: function initialize(options) {
-    this.collection = options.collection;
-    delete options.collection;
-    this.parent = options.parent;
-    delete options.parent;
-    this.options = options;
+    this.state = options.state;
     this.itemViews = [];
   },
-  render: function render() {
-    var $input = this.parent.$input;
-    var parent_pos = $input.position();
-    this.$el.addClass("backbone-autocomplete-dropdown").css({
-      fontSize: $input.css("font-size"),
-      top: parent_pos.top + $input.outerHeight() - 1,
-      minWidth: $input.innerWidth()
-    });
-    this.resetOptions();
-    this.collection.on("sync", this.resetOptions, this);
-  },
-  show: function show() {
-    this.$el.show();
-  },
-  hide: function hide() {
-    this.$el.hide();
-    this.parent.dropdownFocused = false;
-  },
-  resetOptions: function resetOptions() {
-    var _this = this;
+  render: function render(options) {
+    this.$el.css(options.css);
 
-    this.$el.empty();
-    this.itemViews = [];
+    this.renderOptions();
 
-    this.collection.each(function (model) {
-      var view = new Backbone.Autocomplete.DropdownItemView({ model: model });
-      view.on("selected", _this.onSelected, _this);
-      view.on("focused", _this.onFocused, _this);
-      view.render();
-      _this.$el.append(view.el);
-      _this.itemViews.push(view);
-    });
-
-    if (this.collection.length == 1) {
-      this.itemViews[0].focus({ by: "key" });
-    }
-
-    var focused = this.focusedItemView && this.focusedItemView.model;
-    if (focused) {
-      var focused_view = _(this.itemViews).find(function (v) {
-        return v.model.id === focused.id;
-      });
-      if (focused_view) {
-        focused_view.focus({ by: "key" });
-      } else {
-        this.focusedItemView = null;
-      }
-    }
-
-    var selected = this.selectedItemView && this.selectedItemView.model;
-    if (selected) {
-      var selected_view = _(this.itemViews).find(function (v) {
-        return v.model.id === selected.id;
-      });
-      if (!selected_view) {
-        this.selectedItemView = null;
-      }
-    }
-  },
-  focusDown: function focusDown() {
-    this.focusRelative(1);
-  },
-  focusUp: function focusUp() {
-    this.focusRelative(-1);
-  },
-  focusRelative: function focusRelative(offset) {
-    var _this2 = this;
-
-    var view_will_be_focus = void 0;
-    if (this.focusedItemView) {
-      this.itemViews.forEach(function (v, i, list) {
-        if (v == _this2.focusedItemView) {
-          view_will_be_focus = list[i + offset];
-          return;
-        }
-      });
+    if (this.state.get("showDropdown")) {
+      this.$el.show();
     } else {
-      view_will_be_focus = this.itemViews[0];
-    }
-
-    if (view_will_be_focus) {
-      if (this.focusedItemView) {
-        this.focusedItemView.unfocus();
-      }
-      view_will_be_focus.focus({ by: "key" });
+      this.$el.hide();
     }
   },
+  renderOptions: function renderOptions() {
+    this.updateItemViews();
 
+    if (this.state.get("focused") && this.state.get("focusedBy") === "key") {
+      this.scrollToItem(this.state.get("focused"));
+    }
+  },
+  updateItemViews: function updateItemViews() {
+    var new_item_views = [];
+    var collection = this.state.get("collection");
 
-  // キーボードで focus されていたら、click と同じ処理を開始
-  selectItemFocusedByKey: function selectItemFocusedByKey() {
-    var item_view = this.focusedItemView;
-    if (item_view) {
-      if (item_view.focusedBy === "key") {
-        item_view.select();
+    var i = 0;
+
+    for (var _i = 0; _i < collection.length || _i < this.itemViews.length; _i++) {
+      var model = collection.models[_i];
+      var view = this.itemViews[_i];
+
+      if (model && view && model.id === view.model.id) {
+        view.render();
+        new_item_views.push(view);
+      } else {
+        if (model) {
+          var v = new Backbone.Autocomplete.DropdownItemView({ model: model, state: this.state });
+          v.render();
+          this.$el.append(v.el);
+          new_item_views.push(v);
+        }
+
+        if (view) {
+          view.remove();
+        }
       }
     }
+
+    this.itemViews = new_item_views;
   },
   onMouseDown: function onMouseDown() {
-    this.parent.dropdownFocused = true;
+    this.state.updateDropdownFocused(true);
   },
-  onSelected: function onSelected(item_view) {
-    this.hide();
-    this.focusedItemView = item_view;
-    this.selectedItemView = item_view;
-    this.trigger("selected", item_view.model);
-  },
-  onFocused: function onFocused(item_view, _ref) {
-    var _ref$by = _ref.by;
-    var by = _ref$by === undefined ? null : _ref$by;
-
-    this.focusedItemView = item_view;
-
-    if (by === "key") {
-      this.scrollToItemView(item_view);
+  scrollToItem: function scrollToItem(item) {
+    if (!item) {
+      return;
     }
-  },
-  scrollToItemView: function scrollToItemView(item_view) {
+
+    var item_view = _(this.itemViews).find(function (v) {
+      return v.model.id == item.id;
+    });
+    if (!item_view) {
+      return;
+    }
+
     var item_view_top = $(item_view.el).position().top;
     var item_view_height = $(item_view.el).outerHeight();
     var scroll_top = this.$el.scrollTop();
@@ -325,35 +399,26 @@ Backbone.Autocomplete.DropdownItemView = Backbone.View.extend({
   tagName: "li",
   events: {
     "mouseenter": "onMouseEnter",
-    "mouseleave": "onMouseLeave",
     "click": "onClick"
   },
 
+  initialize: function initialize(options) {
+    this.state = options.state;
+    this.model = options.model;
+  },
   render: function render() {
     this.$el.text(this.model.get("label"));
-  },
-  select: function select() {
-    this.trigger("selected", this);
-  },
-  focus: function focus(_ref2) {
-    var _ref2$by = _ref2.by;
-    var by = _ref2$by === undefined ? null : _ref2$by;
-
-    this.$el.addClass("is-selected");
-    this.focusedBy = by;
-    this.trigger("focused", this, { by: by });
-  },
-  unfocus: function unfocus() {
-    this.$el.removeClass("is-selected");
-    this.focusedBy = false;
+    if (this.state.get("focused") && this.state.get("focused").id === this.model.id) {
+      this.$el.addClass("is-selected");
+    } else {
+      this.$el.removeClass("is-selected");
+    }
   },
   onMouseEnter: function onMouseEnter() {
-    this.focus({ by: "mouse" });
-  },
-  onMouseLeave: function onMouseLeave() {
-    this.unfocus();
+    this.state.focusItem(this.model, { by: "mouse" });
   },
   onClick: function onClick() {
-    this.select();
+    this.state.selectItem(this.model);
+    this.state.hideDropdown();
   }
 });
