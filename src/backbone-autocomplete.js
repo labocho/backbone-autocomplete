@@ -39,7 +39,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
 
     // debug
     setInterval(() => {
-      // console.log(this.selected)
+      console.log(this.selected)
     }, 1000);
   },
 
@@ -57,6 +57,14 @@ Backbone.Autocomplete.View = Backbone.View.extend({
     this.fetchCollection();
   },
 
+  updateSelected(model) {
+    this.selected = model;
+    if (model) {
+      this.$input.val(model.get("label"));
+    }
+    this.trigger("change", this);
+  },
+
   onFocus(e) {
     this.showDropdown();
   },
@@ -67,7 +75,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
       this.dropdownView.selectItemFocusedByKey();
 
       if (this.$input.val() === "") {
-        this.selected = null;
+        this.updateSelected(null);
       } else {
         if (this.selected) {
           this.$input.val(this.selected.get("label"));
@@ -86,10 +94,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
   },
 
   onSelected(model) {
-    this.selected = model;
-    this.$input.val(model.get("label"));
-    // debug
-    console.log(model);
+    this.updateSelected(model);
   },
 
   // キー長押しで繰り返し処理するため
@@ -178,6 +183,8 @@ Backbone.Autocomplete.DropdownView = Backbone.View.extend({
     this.itemViews = [];
     this.selectedItemView = null;
     this.focusedItemView = null;
+
+    this.trigger("selected", null);
 
     this.collection.each(model => {
       const view = new Backbone.Autocomplete.DropdownItemView({model: model})

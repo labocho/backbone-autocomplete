@@ -35,6 +35,8 @@ Backbone.Autocomplete.View = Backbone.View.extend({
   },
 
   initialize: function initialize(options) {
+    var _this = this;
+
     this.input = this.$("input")[0];
     this.$input = $(this.input);
     this.collection = options.collection;
@@ -44,7 +46,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
 
     // debug
     setInterval(function () {
-      // console.log(this.selected)
+      console.log(_this.selected);
     }, 1000);
   },
   createDropdownView: function createDropdownView() {
@@ -60,6 +62,13 @@ Backbone.Autocomplete.View = Backbone.View.extend({
 
     this.fetchCollection();
   },
+  updateSelected: function updateSelected(model) {
+    this.selected = model;
+    if (model) {
+      this.$input.val(model.get("label"));
+    }
+    this.trigger("change", this);
+  },
   onFocus: function onFocus(e) {
     this.showDropdown();
   },
@@ -69,7 +78,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
       this.dropdownView.selectItemFocusedByKey();
 
       if (this.$input.val() === "") {
-        this.selected = null;
+        this.updateSelected(null);
       } else {
         if (this.selected) {
           this.$input.val(this.selected.get("label"));
@@ -85,10 +94,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
     this.dropdownFocused = false;
   },
   onSelected: function onSelected(model) {
-    this.selected = model;
-    this.$input.val(model.get("label"));
-    // debug
-    console.log(model);
+    this.updateSelected(model);
   },
 
 
@@ -169,20 +175,22 @@ Backbone.Autocomplete.DropdownView = Backbone.View.extend({
     this.parent.dropdownFocused = false;
   },
   resetOptions: function resetOptions() {
-    var _this = this;
+    var _this2 = this;
 
     this.$el.empty();
     this.itemViews = [];
     this.selectedItemView = null;
     this.focusedItemView = null;
 
+    this.trigger("selected", null);
+
     this.collection.each(function (model) {
       var view = new Backbone.Autocomplete.DropdownItemView({ model: model });
-      view.on("selected", _this.onSelected, _this);
-      view.on("focused", _this.onFocused, _this);
+      view.on("selected", _this2.onSelected, _this2);
+      view.on("focused", _this2.onFocused, _this2);
       view.render();
-      _this.$el.append(view.el);
-      _this.itemViews.push(view);
+      _this2.$el.append(view.el);
+      _this2.itemViews.push(view);
     });
 
     if (this.collection.length == 1) {
@@ -196,12 +204,12 @@ Backbone.Autocomplete.DropdownView = Backbone.View.extend({
     this.focusRelative(-1);
   },
   focusRelative: function focusRelative(offset) {
-    var _this2 = this;
+    var _this3 = this;
 
     var view_will_be_focus = void 0;
     if (this.focusedItemView) {
       this.itemViews.forEach(function (v, i, list) {
-        if (v == _this2.focusedItemView) {
+        if (v == _this3.focusedItemView) {
           view_will_be_focus = list[i + offset];
           return;
         }
