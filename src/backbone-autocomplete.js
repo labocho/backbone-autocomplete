@@ -107,10 +107,6 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
       this.set({selected: null, focused: null});
     }
 
-    if (this.get("collection").length === 1) {
-      this.set({focused: this.get("collection").first()})
-    }
-
     this.trigger("change");
   },
 
