@@ -41,8 +41,8 @@ $(function(){
   Backbone.Autocomplete.DEBUG = true;
   window.autocompleteView = Backbone.Autocomplete.create(
     $("[name=user_name]")[0],
-    { url: "/lang",
-      selected: new Backbone.Model({label: "JavaScript", value: "JavaScript"})
+    { url: "/pref",
+      //selected: new Backbone.Model({label: "JavaScript", value: "JavaScript"})
     }
   );
 

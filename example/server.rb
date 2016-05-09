@@ -275,6 +275,56 @@ XSLT
 zsh
 ".lines.map(&:strip).reject{|l| l.size == 0 }
 
+PREF = %w(
+あいちけん
+あおもりけん
+あきたけん
+いしかわけん
+いばらきけん
+いわてけん
+えひめけん
+おおいたけん
+おおさかふ
+おかやまけん
+おきなわけん
+かがわけん
+かごしまけん
+かながわけん
+ぎふけん
+きょうとふ
+くまもとけん
+ぐんまけん
+こうちけん
+さいたまけん
+さがけん
+しがけん
+しずおかけん
+しまねけん
+ちばけん
+とうきょうと
+とくしまけん
+とちぎけん
+とっとりけん
+とやまけん
+ながさきけん
+ながのけん
+ならけん
+にいがたけん
+ひょうごけん
+ひろしまけん
+ふくいけん
+ふくおかけん
+ふくしまけん
+ほっかいどう
+みえけん
+みやぎけん
+みやざきけん
+やまがたけん
+やまぐちけん
+やまなしけん
+わかやまけん
+)
+
 get "/" do
   redirect "/index.html"
 end
@@ -284,6 +334,13 @@ get "/lang" do
   pattern = Regexp.compile("^" + Regexp.escape(query), Regexp::IGNORECASE)
   content_type "application/json"
   LIST.select{|i| i =~ pattern }.map{|i| {label: i, value: i} }.to_json
+end
+
+get "/pref" do
+  query = params[:q] || ""
+  pattern = Regexp.compile("^" + Regexp.escape(query), Regexp::IGNORECASE)
+  content_type "application/json"
+  PREF.select{|i| i =~ pattern }.map{|i| {label: i, value: i} }.to_json
 end
 
 get "/backbone-autocomplete.js" do

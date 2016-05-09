@@ -71,6 +71,7 @@ Backbone.Autocomplete = {
 // flux の dispatcher, action creator, store の役割
 Backbone.Autocomplete.State = Backbone.Model.extend({
   defaults: {
+    editingQuery: false,
     query: "",
     collection: null,
     dropdownFocused: false,
@@ -125,6 +126,12 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
 
       (_console = console).log.apply(_console, [type].concat(args));
     }
+  },
+  editQuery: function editQuery() {
+    var value = arguments.length <= 0 || arguments[0] === undefined ? true : arguments[0];
+
+    this.logAction("editQuery", value);
+    this.set({ editingQuery: value });
   },
   updateQuery: function updateQuery(query) {
     this.logAction("updateQuery", query);
@@ -197,6 +204,10 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
   selectItem: function selectItem(model) {
     this.logAction("selectItem");
     this.set({ selected: model });
+  },
+  unselectItem: function unselectItem() {
+    this.logAction("unselectItem");
+    this.set({ selected: null });
   }
 });
 
@@ -240,7 +251,10 @@ Backbone.Autocomplete.View = Backbone.View.extend({
     } else {
       this.$el.removeClass("is-invalid");
     }
-    this.$queryField.val(this.state.get("query"));
+
+    if (!this.state.get("editingQuery")) {
+      this.$queryField.val(this.state.get("query"));
+    }
     this.renderDropdownView();
   },
   renderDropdownView: function renderDropdownView() {
@@ -262,6 +276,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
   },
   onBlur: function onBlur(e) {
     if (!this.state.get("dropdownFocused")) {
+      this.state.editQuery(false);
       this.state.selectItemFocusedByKey();
       this.state.hideDropdown();
       if (this.state.get("query") === "") {
@@ -284,9 +299,15 @@ Backbone.Autocomplete.View = Backbone.View.extend({
         this.state.focusDown();
         break;
       case "Enter":
-        this.state.selectItemFocusedByKey();
-        this.state.hideDropdown();
+        if (this.state.get("focused")) {
+          this.state.editQuery(false);
+          this.state.selectItemFocusedByKey();
+          this.state.hideDropdown();
+        }
         break;
+      default:
+        this.state.editQuery(true);
+        this.state.showDropdown();
     }
   },
 
@@ -301,7 +322,11 @@ Backbone.Autocomplete.View = Backbone.View.extend({
       case "Enter":
         break;
       default:
-        this.state.updateQuery(this.$queryField.val());
+        var v = this.$queryField.val();
+        if (v !== this.state.get("query")) {
+          this.state.unselectItem();
+          this.state.updateQuery(v);
+        }
     }
   }
 });
