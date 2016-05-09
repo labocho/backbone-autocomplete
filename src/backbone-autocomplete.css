@@ -2,7 +2,7 @@
   display: inline;
 }
 
-.backbone-autocomplete.is-invalid input {
+.backbone-autocomplete input.is-invalid {
   border-color: #f00;
 }
 

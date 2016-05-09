@@ -320,6 +320,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
         break;
       case "Enter":
         if (this.state.get("focused")) {
+          e.preventDefault(); // submit しない
           this.state.editQuery(false);
           this.state.selectItemFocusedByKey();
           this.state.hideDropdown();

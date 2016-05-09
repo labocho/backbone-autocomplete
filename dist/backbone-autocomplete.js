@@ -113,10 +113,6 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
       this.set({ selected: null, focused: null });
     }
 
-    if (this.get("collection").length === 1) {
-      this.set({ focused: this.get("collection").first() });
-    }
-
     this.trigger("change");
   },
   onChangeQuery: function onChangeQuery() {
@@ -251,7 +247,9 @@ Backbone.Autocomplete.View = Backbone.View.extend({
 
     this.state = new Backbone.Autocomplete.State({
       collection: options.collection,
-      selected: options.selected || null
+      selected: options.selected || null,
+      query: options.selected && options.selected.get("label") || "",
+      openOnFocus: options.openOnFocus
     });
 
     this.state.on("change:selected", function () {
@@ -267,9 +265,9 @@ Backbone.Autocomplete.View = Backbone.View.extend({
   },
   render: function render() {
     if (this.state.get("query") && !this.state.get("selected")) {
-      this.$el.addClass("is-invalid");
+      this.$queryField.addClass("is-invalid");
     } else {
-      this.$el.removeClass("is-invalid");
+      this.$queryField.removeClass("is-invalid");
     }
 
     if (!this.state.get("editingQuery")) {
@@ -300,11 +298,12 @@ Backbone.Autocomplete.View = Backbone.View.extend({
   onBlur: function onBlur(e) {
     if (!this.state.get("dropdownFocused")) {
       this.state.editQuery(false);
-      this.state.selectItemFocusedByKey();
-      this.state.hideDropdown();
       if (this.state.get("query") === "") {
         this.state.selectItem(null);
+        this.state.focusItem(null, { by: null });
       }
+      this.state.selectItemFocusedByKey();
+      this.state.hideDropdown();
     }
   },
 
@@ -323,6 +322,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
         break;
       case "Enter":
         if (this.state.get("focused")) {
+          e.preventDefault(); // submit しない
           this.state.editQuery(false);
           this.state.selectItemFocusedByKey();
           this.state.hideDropdown();
