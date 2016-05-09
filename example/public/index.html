@@ -13,7 +13,7 @@ $(function(){
   Backbone.Autocomplete.DEBUG = true;
   window.autocompleteView = Backbone.Autocomplete.create(
     $("[name=user_name]")[0],
-    { url: "/pref",
+    { url: function(){ return "/pref?q=" + encodeURIComponent(this.query) },
       //selected: new Backbone.Model({label: "JavaScript", value: "JavaScript"})
     }
   );

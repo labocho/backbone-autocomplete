@@ -58,11 +58,18 @@ Backbone.Autocomplete = {
       idAttribute: "value",
     });
 
+    let url_function;
+    if (typeof(url) === "function") {
+      url_function = url;
+    } else {
+      url_function = function() {
+        return url + "?q=" + window.encodeURIComponent(this.query);
+      }
+    }
+
     const collection_class = Backbone.Collection.extend({
       model: model_class,
-      url() {
-        return url + "?q=" + window.encodeURIComponent(this.query);
-      },
+      url: url_function,
     });
 
     return new collection_class;
@@ -441,6 +448,7 @@ Backbone.Autocomplete.DropdownItemView = Backbone.View.extend({
   },
 
   onClick() {
+    this.state.editQuery(false);
     this.state.selectItem(this.model);
     this.state.hideDropdown();
   },

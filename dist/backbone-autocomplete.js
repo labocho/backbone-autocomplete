@@ -52,16 +52,23 @@ Backbone.Autocomplete = {
 
     return collection;
   },
-  createCollectionFromURL: function createCollectionFromURL(_url) {
+  createCollectionFromURL: function createCollectionFromURL(url) {
     var model_class = Backbone.Model.extend({
       idAttribute: "value"
     });
 
+    var url_function = void 0;
+    if (typeof url === "function") {
+      url_function = url;
+    } else {
+      url_function = function url_function() {
+        return url + "?q=" + window.encodeURIComponent(this.query);
+      };
+    }
+
     var collection_class = Backbone.Collection.extend({
       model: model_class,
-      url: function url() {
-        return _url + "?q=" + window.encodeURIComponent(this.query);
-      }
+      url: url_function
     });
 
     return new collection_class();
@@ -444,6 +451,7 @@ Backbone.Autocomplete.DropdownItemView = Backbone.View.extend({
     this.state.focusItem(this.model, { by: "mouse" });
   },
   onClick: function onClick() {
+    this.state.editQuery(false);
     this.state.selectItem(this.model);
     this.state.hideDropdown();
   }
