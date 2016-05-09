@@ -258,9 +258,9 @@ Backbone.Autocomplete.View = Backbone.View.extend({
 
   render() {
     if (this.state.get("query") && !this.state.get("selected")) {
-      this.$el.addClass("is-invalid");
+      this.$queryField.addClass("is-invalid");
     } else {
-      this.$el.removeClass("is-invalid");
+      this.$queryField.removeClass("is-invalid");
     }
 
     if (!this.state.get("editingQuery")) {
