@@ -295,11 +295,12 @@ Backbone.Autocomplete.View = Backbone.View.extend({
   onBlur(e) {
     if (!this.state.get("dropdownFocused")) {
       this.state.editQuery(false);
-      this.state.selectItemFocusedByKey();
-      this.state.hideDropdown();
       if (this.state.get("query") === "") {
         this.state.selectItem(null);
+        this.state.focusItem(null, {by: null});
       }
+      this.state.selectItemFocusedByKey();
+      this.state.hideDropdown();
     }
   },
 
