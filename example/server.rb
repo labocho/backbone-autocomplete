@@ -347,3 +347,8 @@ get "/backbone-autocomplete.js" do
   content_type "text/javascript"
   File.read(__dir__ + "/../dist/backbone-autocomplete.js")
 end
+
+get "/backbone-autocomplete.css" do
+  content_type "text/css"
+  File.read(__dir__ + "/../src/backbone-autocomplete.css")
+end
