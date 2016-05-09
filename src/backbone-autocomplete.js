@@ -87,6 +87,7 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
     focusedBy: null,
     selected: null,
     showDropdown: false,
+    openOnFocus: false,
   },
 
   constructor() {
@@ -105,12 +106,16 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
     if (this.get("collection").length === 0) {
       this.set({selected: null, focused: null});
     }
+
+    if (this.get("collection").length === 1) {
+      this.set({focused: this.get("collection").first()})
+    }
+
     this.trigger("change");
   },
 
   onChangeQuery() {
-    this.get("collection").query = this.get("query");
-    this.get("collection").fetch();
+    this.updateCollection();
   },
 
   onChangeSelected() {
@@ -124,6 +129,11 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
     if (Backbone.Autocomplete.DEBUG) {
       console.log(type, ...args);
     }
+  },
+
+  updateCollection() {
+    this.get("collection").query = this.get("query");
+    this.get("collection").fetch();
   },
 
   editQuery(value = true) {
@@ -209,7 +219,12 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
   unselectItem() {
     this.logAction("unselectItem");
     this.set({selected: null});
-  }
+  },
+
+  updateOpenOnFocus(value) {
+    this.logAction("updateOpenOnFocus", value);
+    this.set("openOnFocus", value);
+  },
 });
 
 Backbone.Autocomplete.View = Backbone.View.extend({
@@ -275,7 +290,10 @@ Backbone.Autocomplete.View = Backbone.View.extend({
   },
 
   onFocus(e) {
-    this.state.showDropdown();
+    if (this.state.get("openOnFocus")) {
+      this.state.updateCollection();
+      this.state.showDropdown();
+    }
   },
 
   onBlur(e) {

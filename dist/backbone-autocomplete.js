@@ -85,7 +85,8 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
     focused: null,
     focusedBy: null,
     selected: null,
-    showDropdown: false
+    showDropdown: false,
+    openOnFocus: false
   },
 
   constructor: function constructor() {
@@ -111,11 +112,15 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
     if (this.get("collection").length === 0) {
       this.set({ selected: null, focused: null });
     }
+
+    if (this.get("collection").length === 1) {
+      this.set({ focused: this.get("collection").first() });
+    }
+
     this.trigger("change");
   },
   onChangeQuery: function onChangeQuery() {
-    this.get("collection").query = this.get("query");
-    this.get("collection").fetch();
+    this.updateCollection();
   },
   onChangeSelected: function onChangeSelected() {
     var selected = this.get("selected");
@@ -133,6 +138,10 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
 
       (_console = console).log.apply(_console, [type].concat(args));
     }
+  },
+  updateCollection: function updateCollection() {
+    this.get("collection").query = this.get("query");
+    this.get("collection").fetch();
   },
   editQuery: function editQuery() {
     var value = arguments.length <= 0 || arguments[0] === undefined ? true : arguments[0];
@@ -215,6 +224,10 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
   unselectItem: function unselectItem() {
     this.logAction("unselectItem");
     this.set({ selected: null });
+  },
+  updateOpenOnFocus: function updateOpenOnFocus(value) {
+    this.logAction("updateOpenOnFocus", value);
+    this.set("openOnFocus", value);
   }
 });
 
@@ -279,7 +292,10 @@ Backbone.Autocomplete.View = Backbone.View.extend({
     $(this.el).append(this.dropdownView.el);
   },
   onFocus: function onFocus(e) {
-    this.state.showDropdown();
+    if (this.state.get("openOnFocus")) {
+      this.state.updateCollection();
+      this.state.showDropdown();
+    }
   },
   onBlur: function onBlur(e) {
     if (!this.state.get("dropdownFocused")) {
