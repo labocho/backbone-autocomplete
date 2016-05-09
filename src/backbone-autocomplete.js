@@ -242,6 +242,8 @@ Backbone.Autocomplete.View = Backbone.View.extend({
     this.state = new Backbone.Autocomplete.State({
       collection: options.collection,
       selected: options.selected || null,
+      query: options.selected && options.selected.get("label") || "",
+      openOnFocus: options.openOnFocus,
     });
 
     this.state.on("change:selected", () => {
