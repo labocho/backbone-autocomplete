@@ -125,7 +125,7 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
   onChangeSelected() {
     const selected = this.get("selected");
     if (selected) {
-      this.set({query: selected.get("label")});
+      this.set({query: selected.get("name") || selected.get("label")});
     }
   },
 
