@@ -160,7 +160,7 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
   },
 
   focusItem(item, {by = null}) {
-    this.logAction("focusItem", {by: by});
+    this.logAction("focusItem", item, {by: by});
     this.set({
       focused: item,
       focusedBy: by,
@@ -212,7 +212,7 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
   },
 
   selectItem(model) {
-    this.logAction("selectItem");
+    this.logAction("selectItem", model);
     this.set({selected: model});
   },
 
