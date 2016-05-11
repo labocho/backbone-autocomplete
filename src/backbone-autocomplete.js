@@ -21,6 +21,12 @@ Backbone.Autocomplete = {
     if (options.selected && options.selected.constructor !== options.collection.model) {
       options.selected = new options.collection.model(options.selected);
     }
+
+    // label に囲まれている場合、dropdownItem のクリック時に queryField の focus イベントが発火してしまう問題を回避
+    $(queryField).closest("label").on("click", function(e) {
+      e.preventDefault();
+    })
+
     const view = new Backbone.Autocomplete.View(
       _({ el: this.createContainerElement(queryField),
           queryField: queryField,
