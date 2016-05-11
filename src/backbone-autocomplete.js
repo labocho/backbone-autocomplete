@@ -313,7 +313,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
   // キー長押しで繰り返し処理するため
   // 文字以外のキーは keydown で処理
   onKeyDown(e) {
-    switch(e.originalEvent.code) {
+    switch(this.getKey(e.originalEvent)) {
       case "ArrowUp":
         e.preventDefault();
         this.state.focusUp();
@@ -338,7 +338,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
 
   // 入力後の文字列を使いたいので、文字のキーは keyup で処理
   onKeyUp(e) {
-    switch(e.originalEvent.code) {
+    switch(this.getKey(e.originalEvent)) {
       case "ArrowUp":
         break;
       case "ArrowDown":
@@ -353,6 +353,41 @@ Backbone.Autocomplete.View = Backbone.View.extend({
         }
     }
   },
+
+  getKey(e) {
+    // Firefox, Chrome
+    if (e.code) {
+      return e.code;
+    }
+
+    // IE11, Edge
+    if (e.key) {
+      switch(e.key.toString()) {
+        case "Up":
+        case "Down":
+        case "Left":
+        case "Right":
+          return "Arrow" + e.key;
+        default:
+          return e.key;
+      }
+    }
+
+    // Safari
+    let v;
+    switch(e.keyCode) {
+      case 37:
+        return "ArrowLeft";
+      case 38:
+        return "ArrowUp";
+      case 39:
+        return "ArrowRight";
+      case 40:
+        return "ArrowDown";
+      case 13:
+        return "Enter";
+    }
+  }
 });
 
 Backbone.Autocomplete.DropdownView = Backbone.View.extend({
