@@ -16,10 +16,14 @@ Backbone.Autocomplete = {
   // @param options.collection [Backbone.Collection]
   // @param options.selected [Backbone.Model]
   create(queryField, options = {}) {
+    options.collection = this.extractCollection(options);
+
+    if (options.selected && options.selected.constructor !== options.collection.model) {
+      options.selected = new options.collection.model(options.selected);
+    }
     const view = new Backbone.Autocomplete.View(
       _({ el: this.createContainerElement(queryField),
           queryField: queryField,
-          collection: this.extractCollection(options),
       }).extend(options)
     );
 
