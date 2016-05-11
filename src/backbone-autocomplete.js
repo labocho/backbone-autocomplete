@@ -290,7 +290,8 @@ Backbone.Autocomplete.View = Backbone.View.extend({
     this.dropdownView.render({
       css: {
         fontSize: $queryField.css("font-size"),
-        top: $queryField.position().top + $queryField.outerHeight() - 1,
+        top: $queryField.position().top + parseInt($queryField.css("margin-top"), 10) + $queryField.outerHeight() - 1,
+        left: $queryField.position().left + parseInt($queryField.css("margin-left"), 10),
         minWidth: $queryField.innerWidth(),
       },
     });
