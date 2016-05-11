@@ -245,7 +245,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
 
   initialize(options) {
     this.queryField = options.queryField;
-    this.$queryField = $(this.queryField).attr("data-backbone-autocomplete-view-query-field", "true");
+    this.$queryField = $(this.queryField).attr({"data-backbone-autocomplete-view-query-field": "true", autocomplete: "off"})
 
     this.state = new Backbone.Autocomplete.State({
       collection: options.collection,
