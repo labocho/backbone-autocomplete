@@ -20,9 +20,19 @@ Backbone.Autocomplete = {
   create: function create(queryField) {
     var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
+    options.collection = this.extractCollection(options);
+
+    if (options.selected && options.selected.constructor !== options.collection.model) {
+      options.selected = new options.collection.model(options.selected);
+    }
+
+    // label に囲まれている場合、dropdownItem のクリック時に queryField の focus イベントが発火してしまう問題を回避
+    $(queryField).closest("label").on("click", function (e) {
+      e.preventDefault();
+    });
+
     var view = new Backbone.Autocomplete.View(_({ el: this.createContainerElement(queryField),
-      queryField: queryField,
-      collection: this.extractCollection(options)
+      queryField: queryField
     }).extend(options));
 
     $(queryField).data("Backbone.Autocomplete.View", view);
@@ -62,7 +72,7 @@ Backbone.Autocomplete = {
       url_function = url;
     } else {
       url_function = function url_function() {
-        return url + "?q=" + window.encodeURIComponent(this.query);
+        return url + "?term=" + window.encodeURIComponent(this.query);
       };
     }
 
@@ -116,12 +126,16 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
     this.trigger("change");
   },
   onChangeQuery: function onChangeQuery() {
+    if (this.get("query") === "") {
+      this.selectItem(null);
+      this.focusItem(null, { by: null });
+    }
     this.updateCollection();
   },
   onChangeSelected: function onChangeSelected() {
     var selected = this.get("selected");
     if (selected) {
-      this.set({ query: selected.get("label") });
+      this.set({ query: selected.get("name") || selected.get("label") });
     }
   },
   logAction: function logAction(type) {
@@ -164,7 +178,7 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
     var _ref$by = _ref.by;
     var by = _ref$by === undefined ? null : _ref$by;
 
-    this.logAction("focusItem", { by: by });
+    this.logAction("focusItem", item, { by: by });
     this.set({
       focused: item,
       focusedBy: by
@@ -214,7 +228,7 @@ Backbone.Autocomplete.State = Backbone.Model.extend({
     }
   },
   selectItem: function selectItem(model) {
-    this.logAction("selectItem");
+    this.logAction("selectItem", model);
     this.set({ selected: model });
   },
   unselectItem: function unselectItem() {
@@ -243,7 +257,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
     var _this2 = this;
 
     this.queryField = options.queryField;
-    this.$queryField = $(this.queryField).attr("data-backbone-autocomplete-view-query-field", "true");
+    this.$queryField = $(this.queryField).attr({ "data-backbone-autocomplete-view-query-field": "true", autocomplete: "off" });
 
     this.state = new Backbone.Autocomplete.State({
       collection: options.collection,
@@ -280,7 +294,8 @@ Backbone.Autocomplete.View = Backbone.View.extend({
     this.dropdownView.render({
       css: {
         fontSize: $queryField.css("font-size"),
-        top: $queryField.position().top + $queryField.outerHeight() - 1,
+        top: $queryField.position().top + parseInt($queryField.css("margin-top"), 10) + $queryField.outerHeight() - 1,
+        left: $queryField.position().left + parseInt($queryField.css("margin-left"), 10),
         minWidth: $queryField.innerWidth()
       }
     });
@@ -298,10 +313,6 @@ Backbone.Autocomplete.View = Backbone.View.extend({
   onBlur: function onBlur(e) {
     if (!this.state.get("dropdownFocused")) {
       this.state.editQuery(false);
-      if (this.state.get("query") === "") {
-        this.state.selectItem(null);
-        this.state.focusItem(null, { by: null });
-      }
       this.state.selectItemFocusedByKey();
       this.state.hideDropdown();
     }
@@ -311,7 +322,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
   // キー長押しで繰り返し処理するため
   // 文字以外のキーは keydown で処理
   onKeyDown: function onKeyDown(e) {
-    switch (e.originalEvent.code) {
+    switch (this.getKey(e.originalEvent)) {
       case "ArrowUp":
         e.preventDefault();
         this.state.focusUp();
@@ -337,7 +348,7 @@ Backbone.Autocomplete.View = Backbone.View.extend({
 
   // 入力後の文字列を使いたいので、文字のキーは keyup で処理
   onKeyUp: function onKeyUp(e) {
-    switch (e.originalEvent.code) {
+    switch (this.getKey(e.originalEvent)) {
       case "ArrowUp":
         break;
       case "ArrowDown":
@@ -350,6 +361,40 @@ Backbone.Autocomplete.View = Backbone.View.extend({
           this.state.unselectItem();
           this.state.updateQuery(v);
         }
+    }
+  },
+  getKey: function getKey(e) {
+    // Firefox, Chrome
+    if (e.code) {
+      return e.code;
+    }
+
+    // IE11, Edge
+    if (e.key) {
+      switch (e.key.toString()) {
+        case "Up":
+        case "Down":
+        case "Left":
+        case "Right":
+          return "Arrow" + e.key;
+        default:
+          return e.key;
+      }
+    }
+
+    // Safari
+    var v = void 0;
+    switch (e.keyCode) {
+      case 37:
+        return "ArrowLeft";
+      case 38:
+        return "ArrowUp";
+      case 39:
+        return "ArrowRight";
+      case 40:
+        return "ArrowDown";
+      case 13:
+        return "Enter";
     }
   }
 });
