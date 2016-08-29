@@ -72,7 +72,11 @@ Backbone.Autocomplete = {
       url_function = url;
     } else {
       url_function = function url_function() {
-        return url + "?term=" + window.encodeURIComponent(this.query);
+        if (url.match(/\?/)) {
+          return url + "&term=" + window.encodeURIComponent(this.query);
+        } else {
+          return url + "?term=" + window.encodeURIComponent(this.query);
+        }
       };
     }
 
